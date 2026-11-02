@@ -1,0 +1,14 @@
+{
+  "name": "chat-site",
+  "version": "1.0.0",
+  "description": "Dark themed chat application with login, moderation roles, and responsive design",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2"
+  }
+}
