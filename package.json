@@ -1,7 +1,7 @@
 {
   "name": "chat-site",
   "version": "1.0.0",
-  "description": "Dark themed chat application with login, moderation roles, and responsive design",
+  "description": "Dark-themed chat site with role-based moderation and responsive UI",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
