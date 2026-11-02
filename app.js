@@ -115,7 +115,9 @@ function renderMessages() {
   const list = document.getElementById('messageList');
   if (!list) return;
 
-  list.innerHTML = (appState.messages || []).map((message) => {
+  const visibleMessages = (appState.messages || []).filter((message) => message.type !== 'system');
+
+  list.innerHTML = visibleMessages.map((message) => {
     const isSystem = message.type === 'system';
     const isSelf = appState.user && message.sender === appState.user.username;
 
