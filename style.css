@@ -223,6 +223,7 @@ h1 {
   flex-direction: column;
   min-height: 100vh;
   background: rgba(5, 11, 20, 0.6);
+  padding-bottom: 80px;
 }
 
 .chat-header {
@@ -433,8 +434,9 @@ h1 {
 
 .logout-btn {
   position: fixed;
+  top: 20px;
   right: 20px;
-  bottom: 20px;
+  bottom: auto;
   z-index: 100;
   padding: 12px 20px;
   background: linear-gradient(135deg, rgba(255, 86, 118, 0.9), rgba(214, 72, 103, 0.95));
@@ -473,8 +475,8 @@ h1 {
   }
 
   .logout-btn {
+    top: 12px;
     right: 12px;
-    bottom: 12px;
     padding: 10px 16px;
   }
 }
