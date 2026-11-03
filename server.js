@@ -7,539 +7,216 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const AUTH_COOKIE = 'chat_session';
 const DATA_DIR = path.join(__dirname, 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
-const MUTES_FILE = path.join(DATA_DIR, 'mutes.json');
-const IP_BANS_FILE = path.join(DATA_DIR, 'ipbans.json');
+const FILES = {
+  users: path.join(DATA_DIR, 'users.json'),
+  messages: path.join(DATA_DIR, 'messages.json'),
+  mutes: path.join(DATA_DIR, 'mutes.json'),
+  ipBans: path.join(DATA_DIR, 'ipbans.json')
+};
+const ONLINE_WINDOW_MS = 60_000;
 
-const ADMIN_PASSWORDS = ['92729', '284847', '9484948', '639473', '903830'];
+// Keep credentials in the deployment environment, never in the public source tree.
 const PRIVILEGED_ADMIN_CREDENTIALS = Object.freeze({
-  nsiJiski: 'nsiJiski',
-  HyUUkj: 'HyUUkj',
-  UKina: 'UKina',
-  Msamu: 'Msamu'
+  nsiJiski: process.env.PRIVILEGED_ADMIN_NSIJISKI || '',
+  HyUUkj: process.env.PRIVILEGED_ADMIN_HYUUKJ || '',
+  UKina: process.env.PRIVILEGED_ADMIN_UKINA || '',
+  Msamu: process.env.PRIVILEGED_ADMIN_MSAMU || ''
 });
+const ADMIN_PASSWORDS = (process.env.ADMIN_PASSWORDS || '').split(',').map((value) => value.trim()).filter(Boolean);
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-function readJson(file, fallback) {
+fs.mkdirSync(DATA_DIR, { recursive: true });
+function readJson(key, fallback) {
   try {
-    if (!fs.existsSync(file)) {
-      fs.writeFileSync(file, JSON.stringify(fallback, null, 2));
-      return fallback;
-    }
-    const raw = fs.readFileSync(file, 'utf8');
+    if (!fs.existsSync(FILES[key])) { fs.writeFileSync(FILES[key], JSON.stringify(fallback, null, 2)); return fallback; }
+    const raw = fs.readFileSync(FILES[key], 'utf8');
     return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+  } catch { return fallback; }
 }
-
-function writeJson(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
-
-function getClientIp(req) {
+function writeJson(key, value) { fs.writeFileSync(FILES[key], JSON.stringify(value, null, 2)); }
+const loadUsers = () => readJson('users', []);
+const loadMessages = () => readJson('messages', []);
+const loadMutes = () => readJson('mutes', {});
+const loadIpBans = () => readJson('ipBans', {});
+const clean = (value) => String(value || '').trim();
+function clientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  return (req.ip || req.connection?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+  return (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : (req.ip || req.socket?.remoteAddress || 'unknown')).replace(/^::ffff:/, '');
 }
-
-function createDefaultMessages() {
-  return [
-    {
-      id: 'welcome-system',
-      sender: 'System',
-      type: 'system',
-      target: 'all',
-      text: 'チャットにようこそ。ログインして会話を始めましょう。',
-      createdAt: Date.now(),
-      replyTo: null,
-      mediaType: null,
-      mediaData: null
-    }
-  ];
-}
-
-function loadUsers() {
-  return readJson(USERS_FILE, []);
-}
-
-function loadMessages() {
-  return readJson(MESSAGES_FILE, createDefaultMessages());
-}
-
-function loadMutes() {
-  return readJson(MUTES_FILE, {});
-}
-
-function loadIpBans() {
-  return readJson(IP_BANS_FILE, {});
-}
-
-function saveUsers(users) {
-  writeJson(USERS_FILE, users);
-}
-
-function saveMessages(messages) {
-  writeJson(MESSAGES_FILE, messages);
-}
-
-function saveMutes(mutes) {
-  writeJson(MUTES_FILE, mutes);
-}
-
-function saveIpBans(ipBans) {
-  writeJson(IP_BANS_FILE, ipBans);
-}
-
-function sanitizeText(value) {
-  return String(value || '').trim();
-}
-
-function pickUsername(baseName, users) {
-  const cleaned = sanitizeText(baseName).replace(/#\d+$/, '');
-  if (!cleaned) return 'Guest';
-
-  let candidate = cleaned;
-  let index = 1;
-  while (users.some((user) => user.username === candidate)) {
-    candidate = `${cleaned}#${index}`;
-    index += 1;
-  }
-
-  return candidate;
-}
-
 function publicUser(user) {
-  if (!user) return null;
-  return {
-    id: user.id,
-    username: user.username,
-    role: user.role,
-    createdAt: user.createdAt,
-    ip: user.ip,
-    isOnline: !!user.isOnline,
-    banned: !!user.banned
-  };
+  // Deliberately omit password, hashes, secrets, and IP for ordinary users.
+  const result = { id: user.id, username: user.username, role: user.role, createdAt: user.createdAt, isOnline: !!user.isOnline, banned: !!user.banned };
+  if (user.ip) result.ip = user.ip;
+  return result;
 }
-
+function touchUser(username, ip) {
+  const users = loadUsers();
+  const user = users.find((item) => item.username === username);
+  if (!user || user.banned) return null;
+  user.isOnline = true;
+  user.lastSeen = Date.now();
+  if (ip) user.ip = ip;
+  writeJson('users', users);
+  return user;
+}
 function authenticate(req) {
   const username = req.cookies?.[AUTH_COOKIE];
   if (!username) return null;
-  const users = loadUsers();
-  return users.find((user) => user.username === username) || null;
+  const user = loadUsers().find((item) => item.username === username) || null;
+  return user && !user.banned ? user : null;
 }
-
-function isPrivilegedAdmin(user) {
-  return !!user && user.role === 'privileged_admin';
-}
-
-function isNormalAdmin(user) {
-  return !!user && user.role === 'admin';
-}
-
-function isAdmin(user) {
-  return !!user && (user.role === 'admin' || user.role === 'privileged_admin');
-}
-
-function canDeleteAll(user) {
-  return !!user && (user.role === 'admin' || user.role === 'privileged_admin');
-}
-
-function canModerate(user) {
-  return !!user && (user.role === 'admin' || user.role === 'privileged_admin');
-}
-
-function getMuteRemaining(username, mutes) {
-  const expires = Number(mutes[username] || 0);
-  if (!expires || Date.now() > expires) {
-    delete mutes[username];
-    return 0;
-  }
-  return Math.max(0, Math.ceil((expires - Date.now()) / 1000));
-}
-
-function requiresLogin(req, res, next) {
+function requireLogin(req, res, next) {
   const user = authenticate(req);
-  if (!user) {
-    return res.status(401).json({ error: 'auth required' });
-  }
+  if (!user) return res.status(401).json({ error: 'ログイン状態を確認できません。再ログインしてください。' });
   req.user = user;
   next();
 }
-
-ensureDataDir();
+const isPrivilegedAdmin = (user) => user?.role === 'privileged_admin';
+const isAdmin = (user) => user?.role === 'admin' || isPrivilegedAdmin(user);
+const visibleMessages = (user) => loadMessages().filter((message) => {
+  if (message.type === 'system' || message.sender === 'System') return false;
+  if (message.type === 'private') return message.sender === user.username || message.target === user.username || isPrivilegedAdmin(user);
+  return true;
+});
+function nextUsername(base, users) {
+  const name = clean(base).replace(/#\d+$/, '') || 'Guest';
+  if (!users.some((user) => user.username === name)) return name;
+  let n = 1;
+  while (users.some((user) => user.username === `${name}#${n}`)) n++;
+  return `${name}#${n}`;
+}
+function onlineView(reqUser) {
+  const now = Date.now();
+  const entries = loadUsers().filter((user) => user.isOnline && now - Number(user.lastSeen || 0) < ONLINE_WINDOW_MS).map((user) => {
+    const value = publicUser(user);
+    if (!isPrivilegedAdmin(reqUser)) delete value.ip;
+    return value;
+  });
+  if (!entries.some((entry) => entry.username === reqUser.username)) entries.push(publicUser(reqUser));
+  return entries;
+}
+function remainingMute(username) {
+  const mutes = loadMutes();
+  const until = Number(mutes[username] || 0);
+  if (until <= Date.now()) { delete mutes[username]; writeJson('mutes', mutes); return 0; }
+  return Math.ceil((until - Date.now()) / 1000);
+}
+function resetChat() { writeJson('messages', []); }
+function upsertVirtualAdmin(username, role, ip) {
+  const users = loadUsers();
+  let user = users.find((entry) => entry.username === username);
+  if (!user) {
+    user = { id: `${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`, username, createdAt: Date.now(), banned: false };
+    users.push(user);
+  }
+  user.role = role; user.ip = ip; user.isOnline = true; user.lastSeen = Date.now();
+  writeJson('users', users);
+  return user;
+}
 
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(__dirname));
-
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, now: Date.now() });
-});
-
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.get('/api/me', (req, res) => {
   const user = authenticate(req);
-  res.json({ user: user ? publicUser(user) : null });
+  const updated = user && touchUser(user.username);
+  res.json({ user: updated ? publicUser(updated) : null });
 });
-
+app.post('/api/presence', requireLogin, (req, res) => {
+  const user = touchUser(req.user.username, clientIp(req));
+  if (!user) return res.status(401).json({ error: 'ログイン状態を確認できません。' });
+  res.json({ ok: true, user: publicUser(user) });
+});
 app.post('/api/register', (req, res) => {
   const users = loadUsers();
-  const username = sanitizeText(req.body.username);
-  const password = sanitizeText(req.body.password);
-  const confirm = sanitizeText(req.body.confirm);
-  const ip = getClientIp(req);
-
-  if (!username || !password || !confirm) {
-    return res.status(400).json({ error: 'ユーザー名とパスワードを入力してください。' });
-  }
-
-  if (password !== confirm) {
-    return res.status(400).json({ error: 'パスワードが確認と一致しません。' });
-  }
-
-  if (password.length < 4) {
-    return res.status(400).json({ error: 'パスワードは4文字以上にしてください。' });
-  }
-
-  if (users.filter((user) => user.ip === ip).length >= 3) {
-    return res.status(400).json({ error: '同じIPアドレスでは3つまでアカウントを作成できます。' });
-  }
-
-  const generatedUsername = pickUsername(username, users);
-  const user = {
-    id: `user-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    username: generatedUsername,
-    password,
-    role: 'user',
-    ip,
-    createdAt: Date.now(),
-    isOnline: false,
-    banned: false
-  };
-
-  users.push(user);
-  saveUsers(users);
+  const username = clean(req.body.username), password = clean(req.body.password), confirm = clean(req.body.confirm), ip = clientIp(req);
+  if (!username || !password || !confirm) return res.status(400).json({ error: 'ユーザー名とパスワードを入力してください。' });
+  if (password !== confirm) return res.status(400).json({ error: 'パスワードが確認と一致しません。' });
+  if (password.length < 4) return res.status(400).json({ error: 'パスワードは4文字以上にしてください。' });
+  if (users.filter((user) => user.ip === ip).length >= 3) return res.status(400).json({ error: '同じIPアドレスでは3つまでアカウントを作成できます。' });
+  const user = { id: `user-${Date.now()}-${Math.random().toString(16).slice(2)}`, username: nextUsername(username, users), password, role: 'user', ip, createdAt: Date.now(), isOnline: true, lastSeen: Date.now(), banned: false };
+  users.push(user); writeJson('users', users);
   res.cookie(AUTH_COOKIE, user.username, { httpOnly: true, sameSite: 'lax' });
-  return res.status(201).json({ ok: true, user: publicUser(user) });
+  res.status(201).json({ ok: true, user: publicUser(user) });
 });
-
 app.post('/api/login', (req, res) => {
-  const users = loadUsers();
-  const username = sanitizeText(req.body.username);
-  const password = sanitizeText(req.body.password);
-  const adminPassword = sanitizeText(req.body.adminPassword);
-  const ip = getClientIp(req);
-
-  if (loadIpBans()[ip]) {
-    return res.status(403).json({ error: 'このIPアドレスはアクセスできません。' });
-  }
-
-  const privilegedMatch = Object.entries(PRIVILEGED_ADMIN_CREDENTIALS).find(([name, pass]) => {
-    return (name === username && pass === password) || pass === adminPassword || name === adminPassword;
-  });
-
-  if (privilegedMatch) {
-    const user = {
-      id: `privileged-${Date.now()}`,
-      username: privilegedMatch[0],
-      password: privilegedMatch[1],
-      role: 'privileged_admin',
-      ip,
-      createdAt: Date.now(),
-      isOnline: true,
-      banned: false
-    };
+  const username = clean(req.body.username), password = clean(req.body.password), adminPassword = clean(req.body.adminPassword), ip = clientIp(req);
+  if (loadIpBans()[ip]) return res.status(403).json({ error: 'このIPアドレスはアクセスできません。' });
+  const privileged = Object.entries(PRIVILEGED_ADMIN_CREDENTIALS).find(([name, secret]) => secret && ((name === username && secret === password) || secret === adminPassword));
+  if (privileged) {
+    const user = upsertVirtualAdmin(privileged[0], 'privileged_admin', ip);
     res.cookie(AUTH_COOKIE, user.username, { httpOnly: true, sameSite: 'lax' });
     return res.json({ ok: true, user: publicUser(user) });
   }
-
   if (adminPassword && ADMIN_PASSWORDS.includes(adminPassword)) {
-    const user = {
-      id: `admin-${Date.now()}`,
-      username,
-      role: 'admin',
-      password: '',
-      ip,
-      createdAt: Date.now(),
-      isOnline: true,
-      banned: false
-    };
+    if (!username) return res.status(400).json({ error: '管理者ログインにはユーザー名を入力してください。' });
+    const user = upsertVirtualAdmin(username, 'admin', ip);
     res.cookie(AUTH_COOKIE, user.username, { httpOnly: true, sameSite: 'lax' });
     return res.json({ ok: true, user: publicUser(user) });
   }
-
+  const users = loadUsers();
   const account = users.find((user) => user.username === username && user.password === password);
-  if (!account) {
-    return res.status(401).json({ error: 'ユーザー名またはパスワードが違います。' });
-  }
-
-  if (account.banned) {
-    return res.status(403).json({ error: 'このアカウントはBANされています。' });
-  }
-
-  account.isOnline = true;
-  account.ip = ip;
-  saveUsers(users);
+  if (!account) return res.status(401).json({ error: 'ユーザー名またはパスワードが違います。' });
+  if (account.banned) return res.status(403).json({ error: 'このアカウントはBANされています。' });
+  account.ip = ip; account.isOnline = true; account.lastSeen = Date.now(); writeJson('users', users);
   res.cookie(AUTH_COOKIE, account.username, { httpOnly: true, sameSite: 'lax' });
-  return res.json({ ok: true, user: publicUser(account) });
+  res.json({ ok: true, user: publicUser(account) });
 });
-
-app.post('/api/logout', requiresLogin, (req, res) => {
-  const users = loadUsers();
-  const user = users.find((item) => item.username === req.user.username);
-  if (user) {
-    user.isOnline = false;
-    saveUsers(users);
-  }
-
-  res.clearCookie(AUTH_COOKIE);
-  res.json({ ok: true });
+app.post('/api/logout', requireLogin, (req, res) => {
+  const users = loadUsers(), user = users.find((entry) => entry.username === req.user.username);
+  if (user) { user.isOnline = false; user.lastSeen = 0; writeJson('users', users); }
+  res.clearCookie(AUTH_COOKIE); res.json({ ok: true });
 });
-
-app.get('/api/users/online', requiresLogin, (req, res) => {
-  const users = loadUsers();
-  const online = users.filter((user) => user.isOnline).map((user) => {
-    const item = publicUser(user);
-    if (!isAdmin(req.user)) {
-      delete item.ip;
-    }
-    return item;
-  });
-  res.json({ users: online });
-});
-
-app.get('/api/messages', requiresLogin, (req, res) => {
-  const messages = loadMessages();
-  const visible = messages.filter((message) => {
-    if (message.type === 'system') return true;
-    if (message.type === 'private') {
-      return message.sender === req.user.username || message.target === req.user.username || isPrivilegedAdmin(req.user);
-    }
-    return true;
-  });
-  res.json({ messages: visible });
-});
-
-app.post('/api/messages', requiresLogin, (req, res) => {
-  const users = loadUsers();
-  const messages = loadMessages();
-  const mutes = loadMutes();
-  const user = req.user;
-  const remaining = getMuteRemaining(user.username, mutes);
-
-  if (remaining > 0) {
-    return res.status(403).json({ error: 'ミュート中です', remaining });
-  }
-
-  const text = sanitizeText(req.body.text);
-  const mediaType = req.body.mediaType || null;
-  const mediaData = req.body.mediaData || null;
-  const target = sanitizeText(req.body.target || 'all');
-  const replyTo = req.body.replyTo || null;
-
+app.get('/api/users/online', requireLogin, (req, res) => res.json({ users: onlineView(req.user) }));
+app.get('/api/messages', requireLogin, (req, res) => res.json({ messages: visibleMessages(req.user) }));
+app.post('/api/messages', requireLogin, (req, res) => {
+  const remaining = remainingMute(req.user.username);
+  if (remaining > 0) return res.status(403).json({ error: `ミュート中です。解除まで ${remaining} 秒です。`, remaining });
+  const text = clean(req.body.text), mediaType = req.body.mediaType || null, mediaData = req.body.mediaData || null, target = clean(req.body.target || 'all');
   if (text === '/削除') {
-    if (!canDeleteAll(user)) {
-      return res.status(403).json({ error: '全メッセージ削除の権限がありません。' });
-    }
-
-    const cleared = [
-      {
-        id: `system-${Date.now()}`,
-        sender: 'System',
-        type: 'system',
-        target: 'all',
-        text: '全メッセージを削除しました。',
-        createdAt: Date.now(),
-        replyTo: null,
-        mediaType: null,
-        mediaData: null
-      }
-    ];
-    saveMessages(cleared);
-    return res.json({ ok: true, messages: cleared });
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '全メッセージ削除の権限がありません。' });
+    resetChat(); return res.json({ ok: true, messages: [] });
   }
-
-  if (!text && !mediaData) {
-    return res.status(400).json({ error: 'メッセージ内容を入力してください。' });
-  }
-
-  if (target !== 'all') {
-    const targetUser = users.find((entry) => entry.username === target);
-    if (!targetUser) {
-      return res.status(404).json({ error: '対象ユーザーが見つかりません。' });
-    }
-  }
-
-  const message = {
-    id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    sender: user.username,
-    target: target || 'all',
-    type: target && target !== 'all' ? 'private' : 'chat',
-    text,
-    createdAt: Date.now(),
-    replyTo,
-    mediaType,
-    mediaData
-  };
-
-  messages.push(message);
-  saveMessages(messages);
-  return res.status(201).json({ ok: true, message });
+  if (!text && !mediaData) return res.status(400).json({ error: 'メッセージ内容を入力してください。' });
+  if (target !== 'all' && !loadUsers().some((user) => user.username === target)) return res.status(404).json({ error: '対象ユーザーが見つかりません。' });
+  const messages = loadMessages();
+  const message = { id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`, sender: req.user.username, target, type: target === 'all' ? 'chat' : 'private', text, createdAt: Date.now(), replyTo: req.body.replyTo || null, mediaType, mediaData };
+  messages.push(message); writeJson('messages', messages); res.status(201).json({ ok: true, message });
 });
-
-app.post('/api/admin/action', requiresLogin, (req, res) => {
+app.post('/api/admin/action', requireLogin, (req, res) => {
   const { action, targetUsername, durationSec } = req.body || {};
-  const users = loadUsers();
+  const users = loadUsers(), target = users.find((user) => user.username === targetUsername);
+  if (!action || !target) return res.status(404).json({ error: '対象ユーザーまたは操作が見つかりません。' });
+  if (action === 'deleteAll') { if (!isAdmin(req.user)) return res.status(403).json({ error: '権限がありません。' }); resetChat(); return res.json({ ok: true }); }
+  if (action === 'ban' || action === 'unban') {
+    if (!isAdmin(req.user)) return res.status(403).json({ error: '権限がありません。' });
+    if (target.role === 'privileged_admin') return res.status(403).json({ error: '特権管理者は対象にできません。' });
+    target.banned = action === 'ban'; if (target.banned) { target.isOnline = false; target.lastSeen = 0; } writeJson('users', users); return res.json({ ok: true });
+  }
+  if (!isPrivilegedAdmin(req.user)) return res.status(403).json({ error: '特権管理者のみ実行できます。' });
+  if (action === 'ipban' || action === 'ipunban') {
+    if (target.role === 'privileged_admin') return res.status(403).json({ error: '特権管理者は対象にできません。' });
+    const bans = loadIpBans(); if (action === 'ipban') { bans[target.ip] = true; target.banned = true; target.isOnline = false; target.lastSeen = 0; } else delete bans[target.ip];
+    writeJson('ipBans', bans); writeJson('users', users); return res.json({ ok: true });
+  }
   const mutes = loadMutes();
-  const ipBans = loadIpBans();
-  const actor = req.user;
-
-  if (!action || !targetUsername) {
-    return res.status(400).json({ error: '対象ユーザーと操作が必要です。' });
-  }
-
-  const target = users.find((user) => user.username === targetUsername);
-  if (!target) {
-    return res.status(404).json({ error: '対象ユーザーが見つかりません。' });
-  }
-
-  if (action === 'deleteAll') {
-    if (!canModerate(actor)) {
-      return res.status(403).json({ error: '全メッセージ削除の権限がありません。' });
-    }
-    const cleared = [
-      {
-        id: `system-${Date.now()}`,
-        sender: 'System',
-        type: 'system',
-        target: 'all',
-        text: '全メッセージが削除されました。',
-        createdAt: Date.now(),
-        replyTo: null,
-        mediaType: null,
-        mediaData: null
-      }
-    ];
-    saveMessages(cleared);
-    return res.json({ ok: true });
-  }
-
-  if (action === 'ban') {
-    if (!canModerate(actor)) {
-      return res.status(403).json({ error: 'BANの権限がありません。' });
-    }
-    if (target.role === 'privileged_admin') {
-      return res.status(403).json({ error: '特権管理者はBANできません。' });
-    }
-    target.banned = true;
-    target.isOnline = false;
-    saveUsers(users);
-    return res.json({ ok: true });
-  }
-
-  if (action === 'unban') {
-    if (!canModerate(actor)) {
-      return res.status(403).json({ error: 'BAN解除の権限がありません。' });
-    }
-    target.banned = false;
-    saveUsers(users);
-    return res.json({ ok: true });
-  }
-
-  if (action === 'ipban') {
-    if (!isPrivilegedAdmin(actor)) {
-      return res.status(403).json({ error: '特権管理者のみIPBANできます。' });
-    }
-    if (target.role === 'privileged_admin') {
-      return res.status(403).json({ error: '特権管理者はIPBANできません。' });
-    }
-    ipBans[target.ip] = true;
-    target.banned = true;
-    target.isOnline = false;
-    saveIpBans(ipBans);
-    saveUsers(users);
-    return res.json({ ok: true, ip: target.ip });
-  }
-
-  if (action === 'ipunban') {
-    if (!isPrivilegedAdmin(actor)) {
-      return res.status(403).json({ error: '特権管理者のみIPBAN解除できます。' });
-    }
-    delete ipBans[target.ip];
-    saveIpBans(ipBans);
-    return res.json({ ok: true });
-  }
-
-  if (action === 'mute') {
-    if (!isPrivilegedAdmin(actor)) {
-      return res.status(403).json({ error: '特権管理者のみミュートできます。' });
-    }
-    const duration = Number(durationSec || 60);
-    if (!Number.isFinite(duration) || duration <= 0) {
-      return res.status(400).json({ error: 'ミュート秒数を正しく入力してください。' });
-    }
-    mutes[target.username] = Date.now() + duration * 1000;
-    saveMutes(mutes);
-    return res.json({ ok: true, remaining: duration });
-  }
-
-  if (action === 'unmute') {
-    if (!isPrivilegedAdmin(actor)) {
-      return res.status(403).json({ error: '特権管理者のみミュート解除できます。' });
-    }
-    delete mutes[target.username];
-    saveMutes(mutes);
-    return res.json({ ok: true });
-  }
-
-  return res.status(400).json({ error: '未対応の管理者操作です。' });
+  if (action === 'mute') { const seconds = Number(durationSec); if (!Number.isFinite(seconds) || seconds <= 0) return res.status(400).json({ error: 'ミュート秒数が不正です。' }); mutes[target.username] = Date.now() + seconds * 1000; writeJson('mutes', mutes); return res.json({ ok: true }); }
+  if (action === 'unmute') { delete mutes[target.username]; writeJson('mutes', mutes); return res.json({ ok: true }); }
+  res.status(400).json({ error: '未対応の操作です。' });
 });
-
-app.delete('/api/messages/:id', requiresLogin, (req, res) => {
-  const messages = loadMessages();
-  const message = messages.find((item) => item.id === req.params.id);
+app.delete('/api/messages/:id', requireLogin, (req, res) => {
+  const messages = loadMessages(), message = messages.find((item) => item.id === req.params.id);
   if (!message) return res.status(404).json({ error: 'メッセージが見つかりません。' });
-
-  const actor = req.user;
-  const allowed = actor.username === message.sender || isPrivilegedAdmin(actor) || isNormalAdmin(actor);
-  if (!allowed) {
-    return res.status(403).json({ error: '削除権限がありません。' });
-  }
-
-  const nextMessages = messages.filter((item) => item.id !== req.params.id);
-  saveMessages(nextMessages);
-  return res.json({ ok: true });
+  if (message.sender !== req.user.username && !isAdmin(req.user)) return res.status(403).json({ error: '削除権限がありません。' });
+  writeJson('messages', messages.filter((item) => item.id !== req.params.id)); res.json({ ok: true });
 });
-
-app.put('/api/messages/:id', requiresLogin, (req, res) => {
-  const messages = loadMessages();
-  const message = messages.find((item) => item.id === req.params.id);
+app.put('/api/messages/:id', requireLogin, (req, res) => {
+  const messages = loadMessages(), message = messages.find((item) => item.id === req.params.id);
   if (!message) return res.status(404).json({ error: 'メッセージが見つかりません。' });
-
-  const actor = req.user;
-  if (message.sender !== actor.username && !isPrivilegedAdmin(actor)) {
-    return res.status(403).json({ error: '編集権限がありません。' });
-  }
-
-  const newText = sanitizeText(req.body.text);
-  if (!newText) {
-    return res.status(400).json({ error: '編集内容がありません。' });
-  }
-
-  message.text = newText;
-  saveMessages(messages);
-  return res.json({ ok: true, message });
+  if (message.sender !== req.user.username && !isPrivilegedAdmin(req.user)) return res.status(403).json({ error: '編集権限がありません。' });
+  const text = clean(req.body.text); if (!text) return res.status(400).json({ error: '編集内容がありません。' });
+  message.text = text; writeJson('messages', messages); res.json({ ok: true, message });
 });
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Chat site running on http://localhost:${PORT}`);
-});
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.listen(PORT, () => console.log(`Chat site running on http://localhost:${PORT}`));
