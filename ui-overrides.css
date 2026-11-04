@@ -1,32 +1,174 @@
-/* Give the conversation much more vertical space and keep long messages readable. */
-html, body { height: 100%; min-height: 100%; }
-body:has(#appShell:not(.hidden)) { display: block; }
-.app-shell { height: 100dvh; min-height: 100dvh; overflow: hidden; }
-.chat-panel { height: 100dvh; min-height: 0; padding-bottom: 0; overflow: hidden; }
-.chat-header { flex: 0 0 72px; }
-.message-list { flex: 1 1 auto; min-height: 0; height: auto; overflow-y: auto; padding: 22px clamp(18px, 3vw, 48px) 28px; gap: 16px; }
-.message { max-width: min(94%, 1180px); }
-.message.self { max-width: min(96%, 1280px); }
-.composer-wrap { position: relative; flex: 0 0 auto; }
-.logout-btn { z-index: 20; }
+/* Conversation layout and larger multiline composer (loaded after style.css). */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
 
-/* The login password field remains masked; never print any credential in labels or UI. */
-#loginPassword, #adminPassword { -webkit-text-security: disc; }
+.app-shell {
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+
+.chat-panel {
+  width: 100%;
+  min-width: 0;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  padding: 0 0 76px;
+  overflow: hidden;
+}
+
+.chat-header {
+  flex: 0 0 72px;
+}
+
+.message-list {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  padding: 24px clamp(16px, 3vw, 52px);
+  gap: 16px;
+}
+
+.message,
+.message.self {
+  max-width: min(96%, 1280px);
+}
+
+.composer-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 18px clamp(14px, 2.5vw, 36px) 20px;
+  background: linear-gradient(180deg, rgba(9, 15, 25, .97), rgba(7, 14, 24, .99));
+}
+
+.composer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 12px;
+  width: 100%;
+}
+
+#chatInput {
+  display: block;
+  width: 100% !important;
+  min-width: 0;
+  height: 150px !important;
+  min-height: 150px !important;
+  max-height: 32vh;
+  resize: vertical;
+  padding: 18px 20px !important;
+  font-size: 1.08rem !important;
+  line-height: 1.55;
+  border: 1px solid rgba(78, 199, 255, .5);
+  border-radius: 16px;
+  color: var(--text);
+  background: rgba(14, 27, 44, .98);
+  outline: none;
+}
+
+#chatInput:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(78, 199, 255, .13);
+}
+
+.file-upload,
+#sendButton {
+  min-height: 58px;
+  height: 58px;
+  align-self: end;
+  white-space: nowrap;
+}
+
+#sendButton {
+  width: auto;
+  min-width: 120px;
+}
+
+#logoutButton {
+  z-index: 20;
+}
 
 @media (max-width: 900px) {
-  body:has(#appShell:not(.hidden)) { overflow: hidden; }
-  .app-shell { display: flex; flex-direction: column; }
-  .sidebar { flex: 0 0 auto; max-height: 22dvh; overflow-y: auto; }
-  .online-list { display: flex; flex-direction: row; overflow-x: auto; padding: 10px 0 2px; }
-  .online-user { flex: 0 0 auto; min-width: 130px; }
-  .chat-panel { flex: 1 1 auto; min-height: 0; }
-  .message-list { padding: 16px 14px 22px; }
-  .message, .message.self { max-width: 98%; }
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    flex: 0 0 auto;
+    max-height: 22vh;
+    max-height: 22dvh;
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .online-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px 0 2px;
+  }
+
+  .online-user {
+    flex: 0 0 auto;
+    min-width: 130px;
+  }
+
+  .chat-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 @media (max-width: 640px) {
-  .chat-header { flex-basis: 62px; height: 62px; padding: 12px 16px; }
-  .message-list { padding: 12px 10px 16px; gap: 12px; }
-  .message, .message.self { max-width: 100%; }
-  .composer-wrap { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  .chat-header {
+    flex-basis: 62px;
+    height: 62px;
+    padding: 12px 16px;
+  }
+
+  .message-list {
+    padding: 14px 10px 18px;
+    gap: 12px;
+  }
+
+  .message,
+  .message.self {
+    max-width: 100%;
+  }
+
+  .composer-wrap {
+    padding: 12px 12px max(14px, env(safe-area-inset-bottom));
+  }
+
+  .composer-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  #chatInput {
+    grid-column: 1 / -1;
+    height: 128px !important;
+    min-height: 128px !important;
+    max-height: 30vh;
+    font-size: 1rem !important;
+  }
+
+  .file-upload,
+  #sendButton {
+    width: 100%;
+    min-width: 0;
+    height: 52px;
+    min-height: 52px;
+  }
 }
