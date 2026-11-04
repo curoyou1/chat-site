@@ -1,4 +1,4 @@
-/* Conversation layout and larger multiline composer (loaded after style.css). */
+/* Large, responsive chat input and full-height conversation layout. */
 html, body { width: 100%; height: 100%; min-height: 100%; }
 .app-shell { width: 100%; max-width: none; height: 100vh; height: 100dvh; min-height: 0; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); }
 .chat-panel { width: 100%; min-width: 0; height: 100vh; height: 100dvh; min-height: 0; padding: 0 0 76px; overflow: hidden; }
@@ -11,10 +11,9 @@ html, body { width: 100%; height: 100%; min-height: 100%; }
 #chatInput:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(78,199,255,.13); }
 .file-upload, #sendButton { min-height: 58px; height: 58px; align-self: end; white-space: nowrap; }
 #sendButton { width: auto; min-width: 120px; }
-#logoutButton { z-index: 20; }
 @media (max-width: 900px) {
   .app-shell { display: flex; flex-direction: column; }
-  .sidebar { flex: 0 0 auto; max-height: 22vh; max-height: 22dvh; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sidebar { flex: 0 0 auto; max-height: 22dvh; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .online-list { flex-direction: row; overflow-x: auto; padding: 10px 0 2px; }
   .online-user { flex: 0 0 auto; min-width: 130px; }
   .chat-panel { flex: 1 1 auto; min-height: 0; }
