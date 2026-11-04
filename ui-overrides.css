@@ -16,6 +16,50 @@
   overflow-y: auto;
 }
 
+/* Give the composer most of the width and height; keep send controls compact. */
+.composer-wrap {
+  flex: 0 0 auto;
+  padding: 14px 18px 18px;
+}
+
+.composer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+}
+
+#chatInput {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 96px;
+  min-height: 96px;
+  resize: vertical;
+  padding: 14px 16px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(16, 27, 40, .95);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.file-upload,
+#sendButton {
+  width: auto;
+  min-width: 84px;
+  height: 52px;
+  min-height: 52px;
+  padding: 10px 14px;
+  align-self: end;
+  white-space: nowrap;
+}
+
+#sendButton {
+  font-size: .95rem;
+}
+
 @media (max-width: 900px) {
   .chat-panel {
     height: auto;
@@ -25,5 +69,30 @@
   .message-list {
     flex: 1 1 0;
     min-height: 120px;
+  }
+}
+
+@media (max-width: 640px) {
+  .composer-wrap {
+    padding: 10px 12px max(14px, env(safe-area-inset-bottom));
+  }
+
+  .composer-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  #chatInput {
+    grid-column: 1 / -1;
+    height: 88px;
+    min-height: 88px;
+  }
+
+  .file-upload,
+  #sendButton {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    min-height: 46px;
   }
 }
