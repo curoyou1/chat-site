@@ -1,7 +1,61 @@
-/* Make the message field take the available width; keep action buttons compact. */
-.composer-wrap {
+/* Full-height chat layout so the message history uses all space above the composer. */
+html,
+body {
   width: 100%;
-  padding: 14px clamp(12px, 2.5vw, 28px) 18px;
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  display: block;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.chat-header {
+  flex: 0 0 72px;
+}
+
+.message-list {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px clamp(16px, 3vw, 52px);
+  gap: 16px;
+}
+
+.admin-tools {
+  flex: 0 0 auto;
+  max-height: 18vh;
+  overflow-y: auto;
+}
+
+/* Keep the composer compact to maximize the visible message history. */
+.composer-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 10px clamp(12px, 2.5vw, 28px) 12px;
 }
 
 .composer-row {
@@ -39,7 +93,58 @@
   font-size: .95rem;
 }
 
+#logoutButton {
+  z-index: 100;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    flex: 0 0 auto;
+    max-height: 22vh;
+    max-height: 22dvh;
+    overflow-y: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .online-list {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px 0 2px;
+  }
+
+  .online-user {
+    flex: 0 0 auto;
+    min-width: 130px;
+  }
+
+  .chat-panel {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+}
+
 @media (max-width: 640px) {
+  .chat-header {
+    flex-basis: 62px;
+    height: 62px;
+    padding: 12px 16px;
+  }
+
+  .message-list {
+    padding: 14px 10px 18px;
+    gap: 12px;
+  }
+
+  .composer-wrap {
+    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+  }
+
   .composer-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 7px;
