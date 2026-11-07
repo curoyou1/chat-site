@@ -78,6 +78,39 @@ body:has(#registerScreen:not(.hidden)) {
   margin-top: 8px;
 }
 
+/* Wider LINE-style message bubbles; reveal actions only when a bubble is tapped. */
+.message {
+  width: fit-content;
+  max-width: min(92%, 1000px);
+  min-width: min(180px, 70%);
+  padding: 14px 18px;
+}
+
+.message.self {
+  max-width: min(94%, 1100px);
+}
+
+.message-actions {
+  display: none;
+}
+
+.message.show-actions .message-actions {
+  display: flex;
+}
+
+/* Messages from other users expose reply only, including for moderators. */
+.message:not(.self) .message-actions [data-action="edit"],
+.message:not(.self) .message-actions [data-action="delete"] {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .message,
+  .message.self {
+    max-width: 96%;
+  }
+}
+
 @media (max-width: 480px) {
   #loginScreen,
   #registerScreen {
@@ -87,5 +120,12 @@ body:has(#registerScreen:not(.hidden)) {
   #loginScreen .login-card,
   #registerScreen .login-card {
     padding: 24px 20px;
+  }
+
+  .message,
+  .message.self {
+    max-width: 100%;
+    min-width: min(150px, 70%);
+    padding: 12px 14px;
   }
 }
