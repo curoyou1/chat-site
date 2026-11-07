@@ -1,131 +1,60 @@
-/* Simplified sign-in and registration screens. */
-body:has(#loginScreen:not(.hidden)),
-body:has(#registerScreen:not(.hidden)) {
-  display: block;
+/* Make the message field take the available width; keep action buttons compact. */
+.composer-wrap {
+  width: 100%;
+  padding: 14px clamp(12px, 2.5vw, 28px) 18px;
 }
 
-#loginScreen,
-#registerScreen {
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 24px;
+.composer-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: center;
+  gap: 10px;
+  width: 100%;
 }
 
-#loginScreen .login-card,
-#registerScreen .login-card {
-  width: min(100%, 360px);
-  padding: 28px;
-  border: 1px solid rgba(156, 185, 214, .18);
-  border-radius: 16px;
-  background: rgba(12, 19, 32, .94);
-  box-shadow: 0 16px 40px rgba(3, 10, 17, .28);
+#chatInput {
+  display: block;
+  width: 100% !important;
+  min-width: 0;
+  min-height: 56px;
+  height: 56px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  border-radius: 12px;
 }
 
-#loginScreen .brand-wrap,
-#registerScreen .brand-wrap {
-  justify-content: flex-start;
-  margin-bottom: 24px;
-}
-
-#loginScreen .brand-mark,
-#registerScreen .brand-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  box-shadow: none;
-  font-size: 1.05rem;
-}
-
-#loginScreen h1,
-#registerScreen h1 {
-  font-size: 1.45rem;
-  font-weight: 650;
-}
-
-#loginScreen .form-group,
-#registerScreen .form-group {
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-#loginScreen .form-group label,
-#registerScreen .form-group label {
-  font-size: .88rem;
-}
-
-#loginScreen .form-group input,
-#registerScreen .form-group input {
+.composer-row .file-upload,
+.composer-row #sendButton {
+  width: auto;
+  min-width: 0;
   min-height: 46px;
-  padding: 11px 12px;
-  border-radius: 9px;
-  background: rgba(18, 31, 46, .72);
+  height: 46px;
+  padding: 10px 14px;
+  white-space: nowrap;
 }
 
-#loginScreen .primary-btn,
-#loginScreen .secondary-btn,
-#registerScreen .primary-btn,
-#registerScreen .secondary-btn {
-  min-height: 44px;
-  padding: 11px 14px;
-  border-radius: 9px;
-  box-shadow: none;
+.composer-row #sendButton {
+  min-width: 68px;
+  margin: 0;
+  font-size: .95rem;
 }
 
-#loginScreen .secondary-btn,
-#registerScreen .secondary-btn {
-  margin-top: 8px;
-}
-
-/* Wider LINE-style message bubbles; reveal actions only when a bubble is tapped. */
-.message {
-  width: fit-content;
-  max-width: min(92%, 1000px);
-  min-width: min(180px, 70%);
-  padding: 14px 18px;
-}
-
-.message.self {
-  max-width: min(94%, 1100px);
-}
-
-.message-actions {
-  display: none;
-}
-
-.message.show-actions .message-actions {
-  display: flex;
-}
-
-/* Messages from other users expose reply only, including for moderators. */
-.message:not(.self) .message-actions [data-action="edit"],
-.message:not(.self) .message-actions [data-action="delete"] {
-  display: none !important;
-}
-
-@media (max-width: 900px) {
-  .message,
-  .message.self {
-    max-width: 96%;
-  }
-}
-
-@media (max-width: 480px) {
-  #loginScreen,
-  #registerScreen {
-    padding: 16px;
+@media (max-width: 640px) {
+  .composer-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 7px;
   }
 
-  #loginScreen .login-card,
-  #registerScreen .login-card {
-    padding: 24px 20px;
+  #chatInput {
+    min-height: 50px;
+    height: 50px;
+    padding: 10px 12px;
   }
 
-  .message,
-  .message.self {
-    max-width: 100%;
-    min-width: min(150px, 70%);
-    padding: 12px 14px;
+  .composer-row .file-upload,
+  .composer-row #sendButton {
+    min-height: 44px;
+    height: 44px;
+    padding: 8px 10px;
   }
 }
