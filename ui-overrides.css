@@ -172,8 +172,8 @@ body {
   border: 0;
   border-radius: 18px 18px 18px 5px;
   padding: 11px 15px;
-  background: #ffffff;
-  color: #222222;
+  background: rgba(18, 30, 45, 0.86);
+  color: var(--text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
 }
 
@@ -182,30 +182,30 @@ body {
   margin-left: 0;
   max-width: min(76%, 760px);
   border-radius: 18px 18px 5px 18px;
-  background: #8de055;
-  color: #222222;
+  background: linear-gradient(135deg, rgba(35, 71, 132, 0.9), rgba(14, 52, 91, 0.9));
+  color: var(--text);
 }
 
 .message-header {
-  color: #707070;
+  color: var(--muted);
 }
 
 .message-author {
-  color: #426b83;
+  color: var(--cyan);
 }
 
 .message.self .message-author {
-  color: #426b32;
+  color: var(--cyan);
 }
 
 .message-content {
-  color: #222222;
+  color: var(--text);
   line-height: 1.55;
 }
 
 .message-content img,
 .message-content video {
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 12px;
 }
 
@@ -218,9 +218,9 @@ body {
 }
 
 .message-actions button {
-  border: 1px solid rgba(0, 0, 0, .12);
-  background: rgba(255, 255, 255, .72);
-  color: #333333;
+  border: 1px solid rgba(100, 162, 255, 0.22);
+  background: rgba(106, 162, 255, 0.14);
+  color: var(--text);
 }
 
 @media (max-width: 640px) {
