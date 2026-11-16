@@ -163,3 +163,69 @@ body {
     padding: 8px 10px;
   }
 }
+
+/* LINE-inspired message bubbles and tap-to-show actions. */
+.message {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: min(76%, 760px);
+  border: 0;
+  border-radius: 18px 18px 18px 5px;
+  padding: 11px 15px;
+  background: #ffffff;
+  color: #222222;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
+}
+
+.message.self {
+  align-self: flex-end;
+  margin-left: 0;
+  max-width: min(76%, 760px);
+  border-radius: 18px 18px 5px 18px;
+  background: #8de055;
+  color: #222222;
+}
+
+.message-header {
+  color: #707070;
+}
+
+.message-author {
+  color: #426b83;
+}
+
+.message.self .message-author {
+  color: #426b32;
+}
+
+.message-content {
+  color: #222222;
+  line-height: 1.55;
+}
+
+.message-content img,
+.message-content video {
+  border: 0;
+  border-radius: 12px;
+}
+
+.message-actions {
+  display: none;
+}
+
+.message.show-actions .message-actions {
+  display: flex;
+}
+
+.message-actions button {
+  border: 1px solid rgba(0, 0, 0, .12);
+  background: rgba(255, 255, 255, .72);
+  color: #333333;
+}
+
+@media (max-width: 640px) {
+  .message,
+  .message.self {
+    max-width: 86%;
+  }
+}
